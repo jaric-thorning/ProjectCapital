@@ -3,6 +3,7 @@ from Tkinter import *
 import tkMessageBox
 import tkFileDialog
 import random
+import time
 
 import share
 
@@ -17,7 +18,7 @@ class App(object):
         self._master = master
         self._master.resizable(FALSE, FALSE)
         self._height = 300
-        self._width = 500
+        self._width = 900
         self._master.minsize(self._width, self._height)
         self._master.title("Project Capital")
         
@@ -61,9 +62,12 @@ class App(object):
             self.canvas.create_line(draw.x0, draw.y0, draw.x1, draw.y1, fill = draw.get_fill())
         self.canvas.pack()
 
-    def add_line(self, x0, y0, x1, y1):
+    def add_line(self, x0, y0, x1, y1, fill = None):
         new_line = Draw_line(x0, y0, x1, y1)
-        new_line.set_fill("red")
+        if fill != None:
+            new_line.set_fill(fill)
+        else:
+            new_line.set_fill("blue")
         self._drawlist.append(new_line)
         
     def draw_rect(self):
@@ -81,7 +85,37 @@ class App(object):
             
             if r < 0: r = 0
             self.add_line(i,self._canvas_height,i,self._canvas_height - r)
-    
+
+    def load_historic(self, share_temp, share_historic):
+        self.clear()
+        print share_temp.get_name()
+        i = 0
+        max_value = float(0.0)
+        firstvalue = 0
+        for day in share_historic:
+            if float(day["Close"]) > max_value: max_value = float(day["Close"])
+        print "Max Value: " + str(max_value)
+        
+        multiplyer = (self._canvas_height - 10)/max_value
+        print "Multipler: " + str(multiplyer)
+        for day in reversed(share_historic):
+            
+            
+            #print "n: " + str(self._canvas_height - float(day["Close"]))
+            #print float(day["Close"])
+
+            if i != 0:
+                if float(day["Close"]) < firstvalue:
+                    self.add_line(i,self._canvas_height,i,self._canvas_height - float(day["Close"])*multiplyer, "red")
+                else:
+                    self.add_line(i,self._canvas_height,i,self._canvas_height - float(day["Close"])*multiplyer, "green")
+                    
+            else:
+                self.add_line(i,self._canvas_height,i,self._canvas_height - float(day["Close"])*multiplyer)
+                
+            firstvalue = float(day["Close"])
+            i += 1
+            
         
 class Draw_line(object):
     def __init__(self, x0, y0, x1, y1):
@@ -105,23 +139,64 @@ class OptionsFrame(Frame):
         self._master = master
         self._boss = boss
         Frame.__init__(self, master)
-        data = Frame(master, bg = "green")
+        data = Frame(master)
 
-        #data   
-        Label(data,text = "Enter Symbol:").pack(side=LEFT)
+        #ENTER LABEL   
+        symbol = Label(data,text = "Enter Symbol:").pack(side=LEFT)
 
+        #ENTER ENTRY
         self.date_entry = Entry(data)
         self.date_entry.pack(side=LEFT, fill = BOTH, expand = True)
+
+        #ENTER BUTTON
+        Button(data,text = "Enter", command = self.update_now).pack(side=LEFT)
         
-        Button(data,text = "Enter", command = self.update).pack(side=LEFT)
+        self.t_symbol = StringVar()
+        self.t_close = StringVar()
+        self.t_change = StringVar()
+        
+
+        self.share_change_color = StringVar()
+        self.share_change_color.set("black")
+        
+        self.share_name = Label(data, textvariable = self.t_symbol)
+        self.share_close = Label(data, textvariable = self.t_close)
+        self.share_change = Label(data, textvariable = self.t_change, fg = self.share_change_color.get())
+
+        self.share_name.pack(side=LEFT, padx = 5)
+        self.share_close.pack(side=LEFT, padx = 5)
+        self.share_change.pack(side=LEFT, padx = 5)
+
         data.pack(anchor = 'sw', padx = 5, pady = 5)
 
-    def update(self):
+    def update_now(self):
         print "updating"
+        share_string = str(self.date_entry.get()) + ".AX"
+        share_temp = share.Stock_Info(share_string)
+        p_date = '2013-01-01'
+        t_date = time.strftime("%Y-%m-%d")
+        share_historic = share_temp.get_historical1(p_date,t_date)
         self._boss.clear()
-        self._boss.draw_example_graph()
+        self._boss.load_historic(share_temp, share_historic)
         self._boss.draw()
-                
+
+        share_temp.update_quote()
+        self.t_symbol.set(share_temp.get_symbol())
+        print share_temp.get_name()
+        self.t_close.set(share_temp.get_quote())
+        print share_temp.get_quote()
+        self.t_change.set(share_temp.get_change() + "%")
+        print share_temp.get_change()
+
+        change = float(share_temp.get_change())
+        if change < 0:
+            self.share_change.config(fg = "red")
+        elif change > 0:
+            self.share_change.config(fg = "green")
+        else:
+            self.share_change.config(fg = "black")
+        self.share_change.pack()
+              
 def main():
     root = Tk()
     app = App(root)
